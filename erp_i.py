@@ -98,13 +98,15 @@ class To_be_verified(public_methods):
         return (con, cur, tb_name)
 
 
-    def excel_date_to_db(self,excel_file=None):
+    def excel_date_to_db(self,excel_file=None,version=None):
         """把excel内容存入数据库
         """
         con, cur, table_name = self.__creat_sqlite()
         excel_data = self.read_excel(excel_file,pack="dict")
-        tmp = excel_file.split('\\')[-1]
-        version = tmp.split('服装')[0]
+        # 如果没有传版本号进来，取excel文档的名字部分
+        if not version:
+            tmp = excel_file.split('\\')[-1]
+            version = tmp.split('服装')[0]
         if not excel_data:
             return None
         # excel表中的标题栏，与数据库的字段名称进行对应，记录在excel标题栏中的位置
