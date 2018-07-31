@@ -47,7 +47,7 @@ class To_be_verified(public_methods):
             return None
 
 
-    def __get_file_list(self,file_path=None):
+    def get_file_list(self,file_path=None):
         """获取文件夹列表"""
         if not file_path:
             return None
@@ -76,7 +76,7 @@ class To_be_verified(public_methods):
         tb_name = "check_in_datas"
         # 对应DLL文件, 是否与人力相关, 问题/需求编号, 功能/问题修改说明, SQL脚本/报表/其它配置文件(含路径), 修改人, 修改日期,
         # 验证状态, 验证人, 验证日期, 打包日期, 是否接口（EDI接口、电商服务、端点）配合升级，模块名称, ERP版本
-        cur.executescript("""drop table if exists check_in_datas""")
+        # cur.executescript("""drop table if exists check_in_datas""")
         cur.executescript("""
             create table if not exists check_in_datas(
             rid INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -108,6 +108,7 @@ class To_be_verified(public_methods):
             tmp = excel_file.split('\\')[-1]
             version = tmp.split('服装')[0]
         if not excel_data:
+            print("can not get data from:",excel_file)
             return None
         # excel表中的标题栏，与数据库的字段名称进行对应，记录在excel标题栏中的位置
         # 此列表的顺序非常重要，要与后面的sql语句的插入字段的顺序对应
@@ -139,9 +140,9 @@ class To_be_verified(public_methods):
             # cur.execute("select sheet_name, erp_version, count(dll) from " + table_name + " where not status = '' and sheet_name = '电商'")
         # cur.execute("select * from "+ table_name)
         # print(cur.fetchall())
-        # cur.close()
         con.commit()
-        return (cur, table_name)
+        cur.close()
+        return (table_name)
 
 
     def get_updateFiles_from_excel(self,excel_file=None):
@@ -274,7 +275,7 @@ class To_be_verified(public_methods):
         local_sql_list = list()
         local_except_file = list()
         for k in ('程序', '报表', '脚本', '人力web'):
-            local_file.extend(self.__data_format(self.__get_file_list(path + k)))
+            local_file.extend(self.__data_format(self.get_file_list(path + k)))
         for t in local_file:
             first_name, last_name = os.path.splitext(t)
             if last_name.lower() in programe_file:
