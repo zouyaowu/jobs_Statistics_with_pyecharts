@@ -6,7 +6,7 @@ import re
 
 
 page = Page()
-page = get_check_in_time_line.check_in_time_line()
+page = get_check_in_time_line.total_check_in_time_line()
 page.render()
 exit(0)
 excel_path = r'./testCase/'
