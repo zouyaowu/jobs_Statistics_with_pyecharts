@@ -1,7 +1,8 @@
 import erp_i
 import sqlite3
 import re
-from pyecharts import Line,Page,Grid
+import time
+from pyecharts import Line,Page,Grid,Scatter
 
 
 def __week_data_line(data1=None,data2=None,paging=True,title=None):
@@ -17,8 +18,8 @@ def __week_data_line(data1=None,data2=None,paging=True,title=None):
     attr = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期天"]
     line1 = Line(str(title))
     line2 = Line()
-    # 遍历每个 data 下面的值，分别统计每个星期日期的个数（如：星期一3个，星期二2个）
     if paging:
+        # 遍历每个 data 下面的值，分别统计每个星期日期的个数（如：星期一3个，星期二2个）
         for key in data1:
             tmp_list = []
             for t in attr:
@@ -52,13 +53,9 @@ def __week_data_line(data1=None,data2=None,paging=True,title=None):
     return grid
 
 
-def total_check_in_time_line(db=None,table=None):
+def total_check_in_time_line(con=None,cur=None,table=None):
     erp = erp_i.To_be_verified()
-    con = sqlite3.connect('test.db3')
-    cur = con.cursor()
     page=Page("签入时间曲线")
-    # print(version[0])
-    timeset = set()
     cur.execute('select date_commit, date_test from check_in_datas')
     test_weeks = []
     dev_weeks = []
@@ -85,23 +82,18 @@ def total_check_in_time_line(db=None,table=None):
     weeks_data["开发提交时间"] = dev_weeks
     weeks_data["测试验证时间"] = test_weeks
     page.add(__week_data_line(weeks_data, paging=False))
-    cur.close()
-    con.close()
     return page
 
 
-def evreyone_check_in_time_line(db=None,table=None,paging=True):
+def evreyone_check_in_time_line(con=None,cur=None,table=None,paging=True):
     """
     通过读取数据库中的记录，整理出开发人员签入待测试文档的时间，测试人员验证签入的时间，形成时间线。
     参数：db 数据库名称，table 表名称， paging 是否按版本分开显示，默认分开显示
     """
     erp = erp_i.To_be_verified()
-    con = sqlite3.connect('test.db3')
-    cur = con.cursor()
     cur.execute('select erp_version from check_in_datas Group BY erp_version')
     page=Page("签入时间曲线")
     for version in cur.fetchall():
-        # print(version[0])
         cur.execute('select author,tester from check_in_datas where erp_version like ?', (version[0],))
         tester = set()
         author = set()
@@ -142,33 +134,43 @@ def evreyone_check_in_time_line(db=None,table=None,paging=True):
                     continue
             if t:
                 tester_week[t] = weeks
-        # print(author_week)
-        # print(tester_week)
 
         page.add(__week_data_line(author_week,tester_week,title=str(version[0])))
-        """
-        grid = Grid(width="100%")
-        attr = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期天"]
-        line_authoer = Line(str(version[0]) + "开发签入\测试验证 所属星期x曲线图")
-        # 遍历每个 author_week 下面的值，分别统计每个星期日期的个数（如：星期一3个，星期二2个）
-        for v in author_week:
-            tmp_list = []
-            for t in attr:
-                tmp_list.append(author_week[v].count(t))
-            author_week[v] = tmp_list
-            line_authoer.add(v, attr, author_week[v], is_label_show=False, is_legend_show=False, legend_pos="70%")
-        grid.add(line_authoer,grid_left="60%")
-
-        line_tester = Line("")
-        for v in tester_week:
-            tmp_list = []
-            for t in attr:
-                tmp_list.append(tester_week[v].count(t))
-            tester_week[v] = tmp_list
-            line_tester.add(v, attr, tester_week[v],  is_label_show=False, is_legend_show=False, legend_pos="20%")
-        grid.add(line_tester,grid_right="60%")
-        page.add(grid)
-        """
-    cur.close()
-    con.close()
     return page
+
+def times_between_pack_finished(con=None,cur=None,table=None):
+    """
+    :param con:
+    :param cur:
+    :param table:
+    :return:
+    """
+    erp = erp_i.To_be_verified()
+    page = Page("签入时间曲线")
+    cur.execute('select date_pack, date_test from check_in_datas')
+    diff_time = []
+    for pack, test in cur.fetchall():
+        if not pack:
+            continue
+
+        if not test:
+            test = time.strftime('%Y-%m-%d',time.localtime())
+        try:
+            t = pack.split(" ")[0]
+            y, m, d = re.split("-|/|\*|\.", t)
+            v = test.split(" ")[0]
+            y1, m1, d1 = re.split("-|/|\*|\.", v)
+            diff = erp.get_balance_day(y, m, d, y1, m1, d1)
+            if diff >= 0:
+                print(diff)
+                diff_time.append(diff)
+            else:
+                # print('maybe err:',test,'-',pack)
+                pass
+        except Exception as err:
+            print(err)
+            print("非法日期:",pack,test)
+    print(diff_time)
+    scatter = Scatter("打包到验证完成时间的时间间隔")
+    scatter.add("",diff_time,diff_time)
+    return page.add(scatter)

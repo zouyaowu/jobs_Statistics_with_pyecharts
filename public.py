@@ -134,3 +134,8 @@ class public_methods(object):
         date = datetime.datetime(y, m, d)
         day = date.weekday()
         return week_day_dict[day]
+
+    def get_balance_day(self,y=1970,m=1,d=1,y1=1970,m1=1,d1=1):
+        t = datetime.datetime.strptime("%s - %s - %s" % (y, m, d), "%Y - %m - %d")
+        t1 = datetime.datetime.strptime("%s - %s - %s" % (y1, m1, d1), "%Y - %m - %d")
+        return (t1 - t).days

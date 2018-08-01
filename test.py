@@ -3,10 +3,13 @@ from pyecharts import Page
 import os
 import erp_i
 import re
+import sqlite3
 
-
+con = sqlite3.connect('test.db3')
+cur = con.cursor()
 page = Page()
-page = get_check_in_time_line.total_check_in_time_line()
+# page = get_check_in_time_line.total_check_in_time_line(con,cur)
+page = get_check_in_time_line.times_between_pack_finished(con,cur)
 page.render()
 exit(0)
 excel_path = r'./testCase/'
