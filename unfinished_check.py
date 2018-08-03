@@ -4,7 +4,7 @@ from pyecharts import Bar, Grid, Page, Timeline
 
 def unfiished_excel_check_result():
     """待验证补丁结果汇总"""
-    """
+
     file_name = [
      r'\\192.168.100.15\品质管制部_内部文件$\客户升级版本\V1.29版本\补丁\服装版本\待验证补丁\V1.29服装待验证补丁文档.xlsx',\
      r'\\192.168.100.15\品质管制部_内部文件$\客户升级版本\V1.30版本\补丁\服装版本\待验证补丁\V1.30服装待验证补丁文档 .xlsx',\
@@ -21,7 +21,7 @@ def unfiished_excel_check_result():
      r'\\192.168.100.15\品质管制部_内部文件$\客户升级版本\宝胜项目\V1.32版本\补丁\待验证补丁\V1.32宝胜服装待验证补丁文档  .xlsx',\
      r'\\192.168.100.15\品质管制部_内部文件$\客户升级版本\宝胜项目\V1.33版本\补丁\待验证补丁\V1.33宝胜服装待验证补丁文档.xlsx'
     ]
-
+    """
     page = Page()
     tl = unfiished_check_result(file_name)
     if tl:

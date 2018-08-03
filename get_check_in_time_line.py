@@ -2,7 +2,7 @@ import erp_i
 import sqlite3
 import re
 import time
-from pyecharts import Line,Page,Grid,Scatter
+from pyecharts import Line,Page,Grid,Scatter,Pie
 
 
 def __week_data_line(data1=None,data2=None,paging=True,title=None):
@@ -138,6 +138,62 @@ def evreyone_check_in_time_line(con=None,cur=None,table=None,paging=True):
         page.add(__week_data_line(author_week,tester_week,title=str(version[0])))
     return page
 
+
+def each_workload(con=None,cur=None,table=None,paging=True):
+    """
+    通过读取数据库中的记录，每人每周的工作量
+    参数：db 数据库名称，table 表名称， paging 用户多的时候是否拆成多个图表来显示
+    """
+    erp = erp_i.To_be_verified()
+    cur.execute('select tester from check_in_datas group by tester')
+    page=Page("工作量")
+    line = Line()
+    for tester in cur.fetchall():
+        cur.execute('select date_test, from check_in_datas where erp_version like ?', (tester[0],))
+
+        tester = set()
+        author = set()
+        for j,k in cur.fetchall():
+            author.add(j)
+            tester.add(k)
+        author_week = {}
+        for a in author:
+            cur.execute('select date_commit from check_in_datas where author=? and erp_version like ?', (a, version[0],))
+            weeks = []
+            for w in cur.fetchall():
+                # 日期存入数据库的格式为 2018-07-29 00:00:00
+                # 去掉时间部分
+                w = w[0].split(' ')[0]
+                # 从数据库取回的值可能为空或不是字日期字符串
+                try:
+                    y,m,d = re.split("-|/|\*|\.",w)
+                    weeks.append(erp.get_week_day(y, m, d))
+                except Exception as values_err:
+                    # print('非法日期:', w)
+                    continue
+            if a:
+                author_week[a] = weeks
+        tester_week = {}
+        for t in tester:
+            cur.execute('select date_test from check_in_datas where tester=? and erp_version like ?', (t, version[0],))
+            weeks = []
+            for w in cur.fetchall():
+                # 日期存入数据库的格式为 2018-07-29 00:00:00
+                # 去掉时间部分
+                w = w[0].split(' ')[0]
+                # 从数据库取回的值可能为空或不是字日期字符串
+                try:
+                    y,m,d = re.split("-|/|\*|\.",w)
+                    weeks.append(erp.get_week_day(y, m, d))
+                except Exception as values_err:
+                    # print('测试人员提交日期，含非法日期格式:', w)
+                    continue
+            if t:
+                tester_week[t] = weeks
+
+        page.add(__week_data_line(author_week,tester_week,title=str(version[0])))
+    return page
+
 def times_between_pack_finished(con=None,cur=None,table=None):
     """
     :param con:
@@ -155,6 +211,7 @@ def times_between_pack_finished(con=None,cur=None,table=None):
 
         if not test:
             test = time.strftime('%Y-%m-%d',time.localtime())
+
         try:
             t = pack.split(" ")[0]
             y, m, d = re.split("-|/|\*|\.", t)
@@ -162,15 +219,38 @@ def times_between_pack_finished(con=None,cur=None,table=None):
             y1, m1, d1 = re.split("-|/|\*|\.", v)
             diff = erp.get_balance_day(y, m, d, y1, m1, d1)
             if diff >= 0:
-                print(diff)
                 diff_time.append(diff)
             else:
                 # print('maybe err:',test,'-',pack)
                 pass
         except Exception as err:
-            print(err)
-            print("非法日期:",pack,test)
-    print(diff_time)
-    scatter = Scatter("打包到验证完成时间的时间间隔")
-    scatter.add("",diff_time,diff_time)
-    return page.add(scatter)
+            pass
+            # print(err)
+            # print("非法日期:",pack,test)
+
+    attr = ['当天', '隔天', '3天', '7天', '15天', '30天', '30天以上']
+    attr_cnt = [[0,0], [1,0], [3,0], [7,0], [15,0], [30,0]]
+    tmp = [0, 0, 0, 0, 0, 0, 0]
+    for i in diff_time:
+        if i == 0:
+            tmp[0] += 1
+        elif i == 1:
+            tmp[1] += 1
+        elif i > 1 and (i <= 3):
+            tmp[2] += 1
+        elif (i > 3) and (i <= 7):
+            tmp[3] += 1
+        elif i > 7 and (i <= 15):
+            tmp[4] += 1
+        elif i > 15 and (i <= 30):
+            tmp[5] += 1
+        else:
+            tmp[6] += 1
+
+    print(tmp)
+    pie = Pie()
+    pie.add("", attr, tmp, is_label_show=True)
+    # scatter = Scatter("打包到验证完成时间的时间间隔")
+    # scatter.add("",diff_time,diff_time)
+    return page.add(pie)
+
