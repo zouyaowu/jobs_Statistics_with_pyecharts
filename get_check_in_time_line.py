@@ -1,7 +1,7 @@
 import erp_i
 import sqlite3
 import re
-import time
+import time,datetime
 from pyecharts import Line,Page,Grid,Scatter,Pie
 
 
@@ -148,8 +148,32 @@ def each_workload(con=None,cur=None,table=None,paging=True):
     cur.execute('select tester from check_in_datas group by tester')
     page=Page("工作量")
     line = Line()
+    attr = []
+    v = []
     for tester in cur.fetchall():
-        cur.execute('select date_test, from check_in_datas where erp_version like ?', (tester[0],))
+        cur.execute('select date_test from check_in_datas where tester like ?', (tester[0],))
+        for w in cur.fetchall():
+            # 日期存入数据库的格式为 2018-07-29 00:00:00
+            # 去掉时间部分
+            w = w[0].split(' ')[0]
+        # 从数据库取回的值可能为空或不是字日期字符串
+        try:
+            y, m, d = re.split("-|/|\*|\.", w)
+            # 第几周
+            ww = datetime.date(int(y), int(m), int(d)).isocalendar()[1]
+            if ww in attr:
+                tmp = attr.index(ww)
+                v[tmp] += 1
+            else:
+                attr.append(ww)
+                v.append(1)
+        except Exception as values_err:
+            print(values_err)
+            # print('非法日期:', w)
+            continue
+    print(attr,v)
+
+"""
 
         tester = set()
         author = set()
@@ -193,6 +217,7 @@ def each_workload(con=None,cur=None,table=None,paging=True):
 
         page.add(__week_data_line(author_week,tester_week,title=str(version[0])))
     return page
+"""
 
 def times_between_pack_finished(con=None,cur=None,table=None):
     """

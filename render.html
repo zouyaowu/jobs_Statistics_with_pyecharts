@@ -9,15 +9,36 @@
 </script>
 </head>
 <body>
-    <div id="a3298dfb5dd54dfb9e959cf0d5980ad9" style="width:800px;height:400px;"></div>
+    <div id="fcc4b95d5cbe48db8518b5409a85d61f" style="width:800px;height:400px;"></div>
 <script type="text/javascript">
 
-var myChart_a3298dfb5dd54dfb9e959cf0d5980ad9 = echarts.init(document.getElementById('a3298dfb5dd54dfb9e959cf0d5980ad9'), 'light', {renderer: 'canvas'});
+var myChart_fcc4b95d5cbe48db8518b5409a85d61f = echarts.init(document.getElementById('fcc4b95d5cbe48db8518b5409a85d61f'), 'light', {renderer: 'canvas'});
 
-var option_a3298dfb5dd54dfb9e959cf0d5980ad9 = {
+var option_fcc4b95d5cbe48db8518b5409a85d61f = {
     "series": [
         {
+            "label": {
+                "normal": {
+                    "textStyle": {
+                        "fontSize": 12
+                    },
+                    "position": "outside",
+                    "formatter": "{b}: {d}%",
+                    "show": true
+                },
+                "emphasis": {
+                    "textStyle": {
+                        "fontSize": 12
+                    },
+                    "show": true,
+                    "formatter": "{b}: {d}%"
+                }
+            },
             "type": "pie",
+            "center": [
+                "50%",
+                "50%"
+            ],
             "data": [
                 {
                     "name": "\u5f53\u5929",
@@ -29,7 +50,7 @@ var option_a3298dfb5dd54dfb9e959cf0d5980ad9 = {
                 },
                 {
                     "name": "3\u5929",
-                    "value": 295
+                    "value": 289
                 },
                 {
                     "name": "7\u5929",
@@ -37,66 +58,49 @@ var option_a3298dfb5dd54dfb9e959cf0d5980ad9 = {
                 },
                 {
                     "name": "15\u5929",
-                    "value": 287
+                    "value": 286
                 },
                 {
                     "name": "30\u5929",
-                    "value": 248
+                    "value": 250
                 },
                 {
                     "name": "30\u5929\u4ee5\u4e0a",
-                    "value": 1030
+                    "value": 1035
                 }
             ],
-            "seriesId": 8350298,
-            "label": {
-                "normal": {
-                    "position": "outside",
-                    "textStyle": {
-                        "fontSize": 12
-                    },
-                    "show": true,
-                    "formatter": "{b}: {d}%"
-                },
-                "emphasis": {
-                    "textStyle": {
-                        "fontSize": 12
-                    },
-                    "show": true,
-                    "formatter": "{b}: {d}%"
-                }
-            },
+            "seriesId": 2724110,
             "radius": [
                 "0%",
                 "75%"
-            ],
-            "center": [
-                "50%",
-                "50%"
             ]
         }
     ],
-    "legend": [
+    "title": [
         {
             "textStyle": {
+                "fontSize": 18
+            },
+            "subtextStyle": {
                 "fontSize": 12
             },
-            "selectedMode": "multiple",
-            "left": "center",
-            "orient": "horizontal",
-            "data": [
-                "\u5f53\u5929",
-                "\u9694\u5929",
-                "3\u5929",
-                "7\u5929",
-                "15\u5929",
-                "30\u5929",
-                "30\u5929\u4ee5\u4e0a"
-            ],
-            "show": true,
-            "top": "top"
+            "left": "auto",
+            "top": "auto"
         }
     ],
+    "tooltip": {
+        "trigger": "item",
+        "axisPointer": {
+            "type": "line"
+        },
+        "textStyle": {
+            "fontSize": 14
+        },
+        "borderColor": "#333",
+        "triggerOn": "mousemove|click",
+        "borderWidth": 0,
+        "backgroundColor": "rgba(50,50,50,0.7)"
+    },
     "color": [
         "#c23531",
         "#2f4554",
@@ -124,52 +128,48 @@ var option_a3298dfb5dd54dfb9e959cf0d5980ad9 = {
         "#918597",
         "#f6f5ec"
     ],
+    "series_id": 2724110,
     "toolbox": {
+        "top": "center",
+        "orient": "vertical",
+        "show": true,
         "feature": {
+            "saveAsImage": {
+                "title": "\u4e0b\u8f7d\u56fe\u7247",
+                "show": true
+            },
             "dataView": {
                 "show": true
             },
             "restore": {
                 "show": true
-            },
-            "saveAsImage": {
-                "show": true,
-                "title": "\u4e0b\u8f7d\u56fe\u7247"
             }
         },
-        "orient": "vertical",
-        "show": true,
-        "left": "95%",
-        "top": "center"
+        "left": "95%"
     },
-    "tooltip": {
-        "axisPointer": {
-            "type": "line"
-        },
-        "textStyle": {
-            "fontSize": 14
-        },
-        "backgroundColor": "rgba(50,50,50,0.7)",
-        "borderColor": "#333",
-        "borderWidth": 0,
-        "triggerOn": "mousemove|click",
-        "trigger": "item"
-    },
-    "title": [
+    "legend": [
         {
-            "top": "auto",
+            "orient": "horizontal",
+            "top": "top",
+            "selectedMode": "multiple",
             "textStyle": {
-                "fontSize": 18
-            },
-            "subtextStyle": {
                 "fontSize": 12
             },
-            "left": "auto"
+            "show": true,
+            "data": [
+                "\u5f53\u5929",
+                "\u9694\u5929",
+                "3\u5929",
+                "7\u5929",
+                "15\u5929",
+                "30\u5929",
+                "30\u5929\u4ee5\u4e0a"
+            ],
+            "left": "center"
         }
-    ],
-    "series_id": 8350298
+    ]
 };
-myChart_a3298dfb5dd54dfb9e959cf0d5980ad9.setOption(option_a3298dfb5dd54dfb9e959cf0d5980ad9);
+myChart_fcc4b95d5cbe48db8518b5409a85d61f.setOption(option_fcc4b95d5cbe48db8518b5409a85d61f);
 
 </script>
 </body>
