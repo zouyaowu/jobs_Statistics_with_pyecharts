@@ -17,8 +17,11 @@ from public import *
 import operator
 import os
 import re
+import copy
+import shutil
 from xml.etree.ElementTree import ElementTree,Element
 import sqlite3
+import xml.etree.ElementTree as xml_ET
 
 
 class To_be_verified(public_methods):
@@ -70,18 +73,20 @@ class To_be_verified(public_methods):
 
     def __creat_sqlite(self):
         """创建sqlite数据库存放数据"""
-        # con = sqlite3.connect(":memory:")
-        con = sqlite3.connect('test.db3')
+        # con = sqlite3.connect(":memory:") #  内存数据库
+        con = sqlite3.connect('erp_i.db3') # 存入文件中
         cur = con.cursor()
         tb_name = "check_in_datas"
         # 对应DLL文件, 是否与人力相关, 问题/需求编号, 功能/问题修改说明, SQL脚本/报表/其它配置文件(含路径), 修改人, 修改日期,
-        # 验证状态, 验证人, 验证日期, 打包日期, 是否接口（EDI接口、电商服务、端点）配合升级，模块名称, ERP版本
-        # cur.executescript("""drop table if exists check_in_datas""")
+        # 验证状态, 验证人, 验证日期, 打包日期, 是否接口（EDI接口、电商服务、端点）配合升级，模块名称, ERP版本，行号，是否挑出
+        # cur.executescript("""drop table if exists """ + tb_name)
+        cur.executescript("""drop table if exists """ + tb_name)
         cur.executescript("""
             create table if not exists check_in_datas(
             rid INTEGER PRIMARY KEY AUTOINCREMENT,
+            row_number char(255),
             dll char(255),
-            hr_related interger,
+            hr_related char(1),
             demand_number char(255),
             change_describe char(1024),
             sql_script char(1024),
@@ -93,53 +98,183 @@ class To_be_verified(public_methods):
             date_pack char(255),
             other_api char(255),
             sheet_name char(255),
-            erp_version char(255))""")
+            erp_version char(255),
+            not_update char(1)
+        )""")
+        cur.executescript("""
+            create table if not exists dlls(
+                rid INTEGER PRIMARY KEY AUTOINCREMENT,
+                row_number char(255),
+                dll char(255),
+                not_update char(1)
+        )""")
+        cur.executescript("""
+            create table if not exists sqls(
+                rid INTEGER PRIMARY KEY AUTOINCREMENT,
+                row_number char(255),
+                sql_script char(1024),
+                not_update char(1)
+        )""")
         # cur.close()
         return (con, cur, tb_name)
+
+
+    def insert_to_db(self,con=None,cur=None,table_name=None,**data):
+        """插入数据到数据库
+        data：要插入的参数，字典类型，按照下面字段
+        dll,hr_related,demand_number,change_describe,sql_script,author,date_commit,status,tester,date_test,date_pack
+        other_api,sheet_name,erp_version,row_number"""
+        # 没有数据库连接、插入的表名
+        if not cur or not table_name:
+            return "没有数据库连接或插入的表名称"
+        # 插入数据库的字段，必须要用 列表，因为先后顺序有要求
+        setment = ["row_number","dll","hr_related","demand_number","change_describe","sql_script","author","date_commit",
+                    "status","tester","date_test","date_pack","other_api","sheet_name","erp_version","not_update"]
+        # 传入的参数超过了预期
+        if len(data) > len(setment):
+            return "传入参数个数超过预期数量"
+        # 插入数据库的字段、对应的值
+        insert_setment = []
+        # 数据表中第一行是自增数据库，在插入时，此字段传None值
+        insert_values = [None]
+        for k in setment:
+            insert_setment.append(k)
+            if k in data.keys():
+                insert_values.append(data[k])
+            else:
+                insert_values.append("0")
+        # 根据数据库中的字段，自动匹配sql语句的占位符
+        insert_tmp = ('?,'*(len(setment)+1))[:-1]
+        # 插入字段，需要元组的格式，并且需要是字符串类型
+        cur.execute('insert into ' + table_name + " values (" + insert_tmp + ')', (tuple(insert_values)))
+        # con.commit()
+        return True
+
+
+    def pack_insert_to_db_data(self,**data):
+        """把插入数据库的数据进行整理，把excel表格中一个单元格的多行数据分成多条记录
+        data是一个字典，与 insert_to_db 里面的data格式一致"""
+        v_tmp = []
+        # print(type(data))
+        # 记录拆分后的记录最长的长度
+        cnt = 0
+        for k, v in data.items():
+            if v:
+                # tmp.append(str(v).split('\n'))
+                # 按照【逗号，换行符，空格】把他们分成多个记录
+                v_tmp = re.split(r'[ ,\n]',str(v))
+                # 在分拆成记录时，会有部分空格被当成单独的记录，清理掉这些空值
+                while '' in v_tmp:
+                    v_tmp.remove('')
+                # 把成多个记录的列表覆盖原来的值
+                data[k] = v_tmp
+                # 记录拆成记录后最长是多少
+                if len(v_tmp) > cnt:
+                    cnt = len(v_tmp)
+
+        # 根据最多的记录数量，把整个字典复制对应次，反回的数据即可直接插入数据库
+        copy_data = []
+        for i in range(0, cnt):
+            # 用于存放临时复制的字典
+            copy_dict = {}
+            for key_word in data:
+                # print(data[key_word])
+                if data[key_word]:
+                    # 如果没有多行，跳过
+                    try:
+                        copy_dict[key_word] = data[key_word][i]
+                        # print(data[key_word][i])
+                    except Exception as bug:
+                        # copy_dict[key_word] = data[key_word][0]
+                        # print(bug)
+                        copy_dict[key_word] = None
+                else:
+                    copy_dict[key_word] = None
+            copy_data.append(copy_dict)
+
+        return copy_data
 
 
     def excel_date_to_db(self,excel_file=None,version=None):
         """把excel内容存入数据库
         """
         con, cur, table_name = self.__creat_sqlite()
-        excel_data = self.read_excel(excel_file,pack="dict")
-        # 如果没有传版本号进来，取excel文档的名字部分
-        if not version:
-            tmp = excel_file.split('\\')[-1]
-            version = tmp.split('服装')[0]
+        excel_data = self.read_excel(excel_file,read_type='column',pack="dict")
+        # print(excel_data)
+        # exit(0)
+        # 如果没有传版本号进来，读取日期
+        # if not version:
+            # tmp = excel_file.split('\\')[-1]
+            # version = tmp.split('服装')[0]
+            # version = str((time.strftime("%Y%m%d%H%M%S", time.localtime())))
         if not excel_data:
             print("can not get data from:",excel_file)
             return None
-        # excel表中的标题栏，与数据库的字段名称进行对应，记录在excel标题栏中的位置
-        # 此列表的顺序非常重要，要与后面的sql语句的插入字段的顺序对应
-        sql_table_fileds = ["对应DLL文件", "是否与人力相关", "问题/需求编号", "功能/问题修改说明", "SQL脚本/报表/其它配置文件(含路径)", "修改人", "修改日期", "验证状态", "验证人", "验证日期", "打包日期", "是否接口（EDI接口、电商服务、端点）配合升级"]
-        fls_v = [-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
-        for sheet_name in excel_data:
-            sheet_date = excel_data[sheet_name]
-            # print(sheet_name, len(excel_data[sheet_name]))
-            # 遍历 excel 标题栏字段与 数据库字段 对应关系的字典
-            if not "对应DLL文件" in sheet_date[0]:
-                continue
-            for x in range(len(sql_table_fileds)):
-                try:
-                    if sql_table_fileds[x] in sheet_date[0]:
-                        # 定位到 要写入数据库的字段内容在哪一列
-                        fls_v[x] = sheet_date[0].index(sql_table_fileds[x])
-                except Exception as bug:
-                    print(bug)
+        # 对应excel表格中的字段，通过这些作为关键字形成字典
+        # sql_files = {"对应DLL文件":None, "是否与人力相关":None, "问题/需求编号":None, "功能/问题修改说明":None,
+                            # "SQL脚本/报表/其它配置文件(含路径)":None, "修改人":None, "修改日期":None, "验证状态":None,
+                            # "验证人":None, "验证日期":None,"打包日期":None,
+                            # "是否接口（EDI接口、电商服务、端点）配合升级":None}
 
-            for rows in sheet_date[1:-1]:
-                if fls_v[1] == -1:
-                    rows[fls_v[1]] = ""
-                cur.execute(
-                    'insert into '+ table_name + '(dll, hr_related, demand_number, change_describe, sql_script, author, ' \
-                    'date_commit, status, tester, date_test, date_pack, other_api, sheet_name, erp_version) ' \
-                    'values (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-                    (rows[fls_v[0]],"",rows[fls_v[2]],rows[fls_v[3]],rows[fls_v[4]],rows[fls_v[5]],rows[fls_v[6]],rows[fls_v[7]],
-                     rows[fls_v[8]],rows[fls_v[9]],rows[fls_v[10]],rows[fls_v[11]],sheet_name,version))
-            # cur.execute("select sheet_name, erp_version, count(dll) from " + table_name + " where not status = '' and sheet_name = '电商'")
-        # cur.execute("select * from "+ table_name)
-        # print(cur.fetchall())
+        # {excel表格字段 : [数据库字段(外键), 从表格读取到的值]
+        # sql_files = {"对应DLL文件": ["dll", None], "是否与人力相关": ["hr_related", None], "问题/需求编号": ["demand_number", None],
+        #              "功能/问题修改说明": ["change_describe", None],
+        #              "SQL脚本/报表/其它配置文件(含路径)": ["sql_script", None], "修改人": ["author", None],
+        #              "修改日期": ["date_commit", None], "验证状态": ["status", None],
+        #              "验证人": ["tester", None], "验证日期": ["date_test", None], "打包日期": ["date_pack", None],
+        #              "是否接口（EDI接口、电商服务、端点）配合升级": ["other_api", None]}
+
+        sql_files = {"对应DLL文件": "dll", "是否与人力相关": "hr_related", "问题/需求编号": "demand_number",
+                     "功能/问题修改说明": "change_describe","SQL脚本/报表/其它配置文件(含路径)": "sql_script","修改人": "author",
+                     "修改日期": "date_commit", "验证状态": "status","验证人": "tester","验证日期": "date_test",
+                     "打包日期": "date_pack","是否接口（EDI接口、电商服务、端点）配合升级": "other_api"}
+        # {数据库字段(外键) : 要插入数据库的值}
+        insert_data_mod = {"row_number":None,"dll":None,"hr_related":None,"demand_number":None,"change_describe":None,
+                       "sql_script":None,"author":None,"date_commit":None,"status":None,"tester":None,"date_test":None,
+                       "date_pack":None,"other_api":None,"sheet_name":None,"erp_version":None,"not_update":None}
+
+        # {数据库字段名称:{excel表字段名称, 准备写入数据库的值}, ...}
+        # sql_files = {"dll": {"对应DLL文件", None}, "hr_related": {"是否与人力相关", None}, "demand_number": {"需求编号",None},
+        #             "change_describe": {"功能/问题修改说明", None}, "sql_script": {"SQL脚本/报表/其它配置文件", None},
+        #             "author": {"修改人", None}, "date_commit": {"修改日期", None}, "status": {"验证状态", None},
+        #             "tester": {"验证人", None}, "date_test": {"验证日期",None}, "date_pack": {"打包日期",None},
+        #             "other_api": {"是否接口（EDI接口、电商服务、端点）配合升级", None}}
+        # len(excel_data) 读取的excel 里面有多少个【工作表】
+        # len(excel_data[0]) 每个【工作表】有多少列
+        # len(excel_data[0][0]) 每列有多少个数据
+        # for sheet in excel_data:  # 表长度 (遍历所有【工作表】)
+        #    for row in column: # 行长度
+        #        for column in sheet: # 列长度（遍历列）
+
+
+        for sheets_name in excel_data:
+            # 表格第一行第一列，如果不是“对应DLL文件”，则认为这个表格不是目标表格，跳过
+            try:
+                if excel_data[sheets_name][0][0] != "对应DLL文件":
+                    raise NoData
+            except Exception as NoData:
+                continue
+            # 表格数据行数
+            row_len = len(excel_data[sheets_name][0])
+            # 每行
+            for row in range(1, row_len):
+                # 每次都要清空数据
+                insert_data = copy.deepcopy(insert_data_mod)
+                # 每列
+                for column in excel_data[sheets_name]:
+                    # 第一列第一个，表格的字段名称
+                    field = column[0]
+                    # 有些第一行为空的列）
+                    if not field:
+                        continue
+                    # insert_data[sql_files[field]] 对应数据库中的字段名，如：dll、demand_number、sql_script
+                    insert_data[sql_files[field]] = column[row]
+                # 版本号
+                insert_data["erp_version"] = str(version)
+                insert_data["row_number"] = row
+                insert_data["sheet_name"] = sheets_name
+                # 每一行插入一条数据
+                self.insert_to_db(con, cur, table_name, **insert_data)
         con.commit()
         cur.close()
         return (table_name)
@@ -428,8 +563,41 @@ class To_be_verified(public_methods):
 
 
     def create_upgrade_package(self,pack_path=None,version=None,last_version=None):
-        """自动整理要发布的补丁
-        1、拷贝待验证补丁的文件；2、修改程序版本号、修改数据库版本号；3、根据文档标签，删除不需要的内容"""
+        """
+        自动整理要发布的补丁
+        1、拷贝待验证补丁的文件；2、修改程序版本号、修改数据库版本号；3、根据文档标签，删除不需要的内容
+        """
+        if not (version and last_version):
+            return False
+        pack_path = r'G:\soucre\flask-echarts\jobs_Statistics_with_pyecharts\testCase\补丁版本\待验证补丁'
+        # 复制文件夹，都只能是目录，且目标目录必须不存在
+        version_path = os.path.join(os.getcwd(), version)
+        # 如果存在有版本目录，先删除
+        if os.path.exists(version_path):
+            pass
+            # shutil.rmtree(version_path)
+        # shutil.copytree(pack_path, version_path)
+        version_xml = os.path.join(version_path,"程序\\VersionConfig.xml")
+        version_sql = os.path.join(version_path,"脚本\\版本脚本.sql")
+
+        # 处理程序版本号文件
+        tree = xml_ET.parse(version_xml)
+        root = tree.getroot()
+        sub = root.find("VersionInfo")
+        for i in sub:
+            if i.tag == "VersionNo":
+                i.text = version + '(' + (time.strftime("%Y-%m-%d", time.localtime())) + ')'
+            elif i.tag == "LastVersionNo":
+                i.text = str(last_version)
+            elif i.tag == "IsNeedCompareDBVersion":
+                i.text = "1"
+            elif i.tag == "IsShowVersionNoInText":
+                i.text = "0"
+        tree.write(version_xml,encoding='UTF-8', xml_declaration='yes')
+
+        # 处理数据库版本号
+
+        # 根据文档，删除不需要的内容
 
 
     def unfinished_test(self,excel_file=None):
