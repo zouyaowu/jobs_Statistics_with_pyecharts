@@ -2,7 +2,7 @@ import erp_i
 import sqlite3
 import re
 import time,datetime
-from pyecharts import Line,Page,Grid,Scatter,Pie
+from pyecharts.charts import Line,Page,Grid,Scatter,Pie
 
 
 def __week_data_line(data1=None,data2=None,paging=True,title=None):
@@ -148,8 +148,10 @@ def each_workload(con=None,cur=None,table=None,paging=True):
     cur.execute('select tester from check_in_datas group by tester')
     page=Page("工作量")
     line = Line()
-    attr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-            27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52]
+    # attr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+            # 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52]
+    # 第几周
+    attr = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52]
     v = []
     for tester in cur.fetchall():
         cur.execute('select date_test from check_in_datas where tester like ?', (tester[0],))

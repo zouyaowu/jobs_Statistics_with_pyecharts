@@ -26,6 +26,14 @@ import xml.etree.ElementTree as xml_ET
 
 class To_be_verified(public_methods):
 
+    def __init__(self):
+        # 数据库连接
+        # self.con = sqlite3.connect(":memory:") #  内存数据库
+        self.con = sqlite3.connect('erp_i.db3')  # 存入文件中
+        self.cur = self.con.cursor()
+        self.table_name = "check_in_datas"
+
+
     def __data_format(self,data):
         """
         功能：对数据做格式化处理
@@ -56,14 +64,21 @@ class To_be_verified(public_methods):
             return None
         # file_set = set()
         file_list = []
+        files_modify_date = {}
         try:
             for fpath, dirs, fs in os.walk(file_path):
                 # file_set = file_set | set(fs)
-                file_list.extend(fs)
-        except:
-            pass
+                # file_list.extend(fs)
+                # 获取文件修改时间
+                for file in fs:
+                    full_path = os.path.join(fpath, file)
+                    mtime = os.stat(full_path).st_mtime
+                    file_modify_time = time.strftime('%Y-%m-%d', time.localtime(mtime))
+                    files_modify_date[file] = file_modify_time
+        except Exception as err:
+            print("Get file ist err :%s", str(err))
             # return (file_set)
-        return (file_list)
+        return (files_modify_date)
 
 
     def __clean_verified_excel(self,excelfile=None):
@@ -73,15 +88,11 @@ class To_be_verified(public_methods):
 
     def __creat_sqlite(self):
         """创建sqlite数据库存放数据"""
-        # con = sqlite3.connect(":memory:") #  内存数据库
-        con = sqlite3.connect('erp_i.db3') # 存入文件中
-        cur = con.cursor()
-        tb_name = "check_in_datas"
         # 对应DLL文件, 是否与人力相关, 问题/需求编号, 功能/问题修改说明, SQL脚本/报表/其它配置文件(含路径), 修改人, 修改日期,
         # 验证状态, 验证人, 验证日期, 打包日期, 是否接口（EDI接口、电商服务、端点）配合升级，模块名称, ERP版本，行号，是否挑出
-        # cur.executescript("""drop table if exists """ + tb_name)
-        cur.executescript("""drop table if exists """ + tb_name)
-        cur.executescript("""
+        # self.cur.executescript("""drop table if exists """ + tb_name)
+        self.cur.executescript("""drop table if exists """ + self.table_name)
+        self.cur.executescript("""
             create table if not exists check_in_datas(
             rid INTEGER PRIMARY KEY AUTOINCREMENT,
             row_number char(255),
@@ -101,25 +112,25 @@ class To_be_verified(public_methods):
             erp_version char(255),
             not_update char(1)
         )""")
-        cur.executescript("""
+        self.cur.executescript("""
             create table if not exists dlls(
                 rid INTEGER PRIMARY KEY AUTOINCREMENT,
                 row_number char(255),
                 dll char(255),
                 not_update char(1)
         )""")
-        cur.executescript("""
+        self.cur.executescript("""
             create table if not exists sqls(
                 rid INTEGER PRIMARY KEY AUTOINCREMENT,
                 row_number char(255),
                 sql_script char(1024),
                 not_update char(1)
         )""")
-        # cur.close()
-        return (con, cur, tb_name)
+        # self.cur.close()
+        return True
 
 
-    def insert_to_db(self,con=None,cur=None,table_name=None,**data):
+    def insert_to_db(self,cur=None,table_name=None,**data):
         """插入数据到数据库
         data：要插入的参数，字典类型，按照下面字段
         dll,hr_related,demand_number,change_describe,sql_script,author,date_commit,status,tester,date_test,date_pack
@@ -147,7 +158,8 @@ class To_be_verified(public_methods):
         insert_tmp = ('?,'*(len(setment)+1))[:-1]
         # 插入字段，需要元组的格式，并且需要是字符串类型
         cur.execute('insert into ' + table_name + " values (" + insert_tmp + ')', (tuple(insert_values)))
-        # con.commit()
+        # 不实时提交，否则性能太低
+        # self.con.commit()
         return True
 
 
@@ -198,8 +210,11 @@ class To_be_verified(public_methods):
     def excel_date_to_db(self,excel_file=None,version=None):
         """把excel内容存入数据库
         """
-        con, cur, table_name = self.__creat_sqlite()
+        if not self.__creat_sqlite():
+            print("创建表失败")
+            return False
         excel_data = self.read_excel(excel_file,read_type='column',pack="dict")
+        # print(self.get_excel_max_rows_and_colums(excel_file))
         # print(excel_data)
         # exit(0)
         # 如果没有传版本号进来，读取日期
@@ -246,7 +261,6 @@ class To_be_verified(public_methods):
         #    for row in column: # 行长度
         #        for column in sheet: # 列长度（遍历列）
 
-
         for sheets_name in excel_data:
             # 表格第一行第一列，如果不是“对应DLL文件”，则认为这个表格不是目标表格，跳过
             try:
@@ -274,10 +288,10 @@ class To_be_verified(public_methods):
                 insert_data["row_number"] = row
                 insert_data["sheet_name"] = sheets_name
                 # 每一行插入一条数据
-                self.insert_to_db(con, cur, table_name, **insert_data)
-        con.commit()
-        cur.close()
-        return (table_name)
+                self.insert_to_db(self.cur, self.table_name, **insert_data)
+        self.con.commit()
+        # self.cur.close()
+        return True
 
 
     def get_updateFiles_from_excel(self,excel_file=None):
@@ -352,6 +366,91 @@ class To_be_verified(public_methods):
         # script_set.remove('')
         return (dll_set, script_set, except_file)
 
+    def check_update_files_and_local_files(self,check_path='./', excel_file=None):
+        """
+        升级文件检查
+        :return:字典 {excel_miss:[], local_miss:[], files_time_mstake:[]}
+        """
+        # 获取本地文件列表（文件名、修改日期）
+        file_name_and_modify_date = self.get_file_list(check_path)
+        file_name_keys = list(file_name_and_modify_date.keys())
+        file_name = [s.lower() for s in file_name_keys if isinstance(s, str) == True]
+        # print("找到的文件", file_name)
+
+        # 逐行对比excel记录（先存入表格中），检查文件名、修改日期
+        # version = time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime(time.time()))
+        version = "V1.29.46.001"
+        # self.excel_date_to_db(excel_file, version)
+        if not self.excel_date_to_db(excel_file, version):
+            print("无法创建数据表，检查失败")
+            return False
+        # 此处应该要动态配置表名，但是用 (?) 方式会导致报错，待解决
+        getfile_sql = "select sheet_name,row_number,dll,sql_script,date_pack from check_in_datas"
+        cor = self.cur.execute(getfile_sql)
+        # 记录找到的 文件名称
+        excel_dll_files_found_in_local = []
+        excel_sql_files_found_in_local = []
+        # 未找到的文件
+        excel_dll_files_not_found_in_local = []
+        excel_sql_files_not_found_in_local = []
+        for i in cor.fetchall():
+            # 数据库里面的程序列
+            # print(i[0],"|",i[1],"|",i[2],"|",i[3],"|",i[4])
+            row_number = i[1]
+            excel_dll = i[2]
+            # 数据库记录的excel脚本列
+            excel_sql = i[3]
+            excel_date_pack = i[4]
+            excel_sql = excel_sql.replace("\\", "/")
+            excel_dll = excel_dll.replace("\\","/")
+            # 逐行检查
+            for k in excel_dll.split("\n"):
+                # dll这栏可能没写后缀名,是 dll 或 exe，目前暂未出现dll与exe的文件名一致的
+                k = k.strip()
+                if len(k) > 4:
+                    if k[-4:] == ".dll" or k[-4:] == ".exe":
+                        tmp_exe = tmp_dll = k
+                    else:
+                        tmp_dll = k + ".dll"
+                        tmp_exe = k + ".exe"
+                else:
+                    tmp_dll = k + ".dll"
+                    tmp_exe = k + ".exe"
+                # print(tmp_dll.lower(), "in ", file_name)
+                if tmp_dll.lower() in file_name:
+                    excel_dll_files_found_in_local.append(tmp_dll)
+                elif tmp_exe.lower() in file_name:
+                    excel_dll_files_found_in_local.append(tmp_exe)
+                else:
+                    # 没有找到文件
+                    if k:
+                        # print("没找到的dll[%s,%s] in %s" % (tmp_dll.lower(), tmp_exe.lower(),file_name))
+                        # excel_dll_files_not_found_in_local.append(k + "," + row_number)
+                        excel_dll_files_not_found_in_local.append(k)
+            for j in excel_sql.split("\n"):
+                j = j.strip()
+                tmp_sql = j.split("/")[-1]
+                if tmp_sql.lower() in file_name:
+                    excel_sql_files_found_in_local.append(tmp_sql)
+                    # print("in excel", j)
+                else:
+                    if tmp_sql:
+                        # excel_sql_files_not_found_in_local.append(tmp_sql + "," + row_number)
+                        excel_sql_files_not_found_in_local.append(tmp_sql)
+
+        print("****************")
+        print("excel中统计到文件数量：%s / 本地找到的文件数：%s " % ((len(set(excel_sql_files_found_in_local)) + \
+                                                                    len(set(excel_dll_files_found_in_local))) , len(file_name)))
+        # print("找到的dll", set(excel_dll_files_found_in_local))
+        print("****************")
+        # 本地找到，excel没有
+        print("本地找到，excel中没有的文件: ", set(file_name) - set(excel_dll_files_found_in_local) - set(excel_sql_files_found_in_local))
+        print("****************")
+        # excel 有，本地没有的
+        print("excel中的程序文件，在本地没找到：", set(excel_dll_files_not_found_in_local))
+        print("excel中的脚本文件，在本地没找到：", set(excel_sql_files_not_found_in_local))
+        print("****************")
+
 
     def patch_check(self,path='./', excel_file=None):
         """
@@ -360,7 +459,7 @@ class To_be_verified(public_methods):
             入参：path=补丁目录（如果没有则默认当前目录）;
                       execel_file=表格文件路径（可选）如果没有表格路径，则读取目录中的第一个 .xlsx 文件
         """
-        # 如果不传 excel 文件名，则在检查目录总查找
+        # 如果不传 excel 文件名，则在当前目录查找
         if not excel_file:
             for i in os.listdir(path):
                 if os.path.splitext(i)[1].lower() == '.xlsx':
@@ -577,7 +676,7 @@ class To_be_verified(public_methods):
             pass
             # shutil.rmtree(version_path)
         # shutil.copytree(pack_path, version_path)
-        version_xml = os.path.join(version_path,"程序\\VersionConfig.xml")
+        version_xml = os.path.join(version_path,"程序\\Versionconfig.xml")
         version_sql = os.path.join(version_path,"脚本\\版本脚本.sql")
 
         # 处理程序版本号文件

@@ -1,15 +1,15 @@
 # -*- coding:utf-8 -*-
-#-------------------------------------------------------------------------------
-# Name:        对excel 操作的封装
-# Purpose:     支持 2007及以后的 xecel 版本
+# -------------------------------------------------------------------------------
+#  Name:        对excel 操作的封装
+#  Purpose:     支持 2007及以后的 xecel 版本
 #
-# Author:      zou.yw
+#  Author:      zou.yw
 #
-# Created:     2018/4/27
-# Modifiy:
-# Copyright:   (c) zou.yw 2018
-# Licence:     GPL
-#-------------------------------------------------------------------------------
+#  Created:     2018/4/27
+#  Modifiy:     2020/4/09
+#  Copyright:   (c) zou.yw 2020
+#  Licence:     MIT
+# -------------------------------------------------------------------------------
 
 from openpyxl import Workbook, load_workbook
 import operator
@@ -33,87 +33,97 @@ class public_methods(object):
         """
 
         try:
+            # 先获取此文件的有效行列
+            excel_max_row_and_colum = self.get_excel_max_rows_and_colums(data)
+            # print(excel_max_row_and_colum)
             # 打开文件
-            workbook = load_workbook(data)
+            workbook = load_workbook(data, read_only=True)
             # 获取所有sheet，返回列表，格式：[u'sheet1', u'sheet2']
-            # workbook_sheets_list = workbook.get_sheet_names()
-            workbook_sheets_list = workbook.sheetnames
+            # workbook_sheets_list = workbook.sheetnames
             wb_sheets = {}
-            data_set = set()
+            tmp_list = []
             data_list = list()
-            for sheet_name in workbook_sheets_list:
-                # sheet = workbook.get_sheet_by_name(sheet_name)
-                sheet = workbook[sheet_name]
-                # 统计空行的数量，如果连续空一定数量行，则认为表格后面都是空的，跳过
-                # 避免有些单元格设置了格式，但是没有实际数据时，会一直在遍历这些单元格
-                # print(sheet.title, sheet.max_row, sheet.max_column)
-                null_cnt = 0
+            for sheet in workbook:
+                max_row = excel_max_row_and_colum[sheet.title][0]
+                max_colum = excel_max_row_and_colum[sheet.title][1]
+                # print(sheet.title, max_row, max_colum)
                 sheet_all_rows = []
-                if read_type =='row':
-                    sheet_item = sheet.rows
-                else:
-                    sheet_item = sheet.columns
+                row_index = 1  # 当前的行数
                 # 遍历工作簿所有单元格
-                for colu_row in sheet_item:
-                    # 遍历每行或列
+                for row in sheet.rows:
                     # 遍历每个单元格
-                    for cel_index in range(len(colu_row)):
-                        if colu_row[cel_index].value:
-                            # null_cnt = 0
-                            # tmp.append(colu_row[cel_index].value)
-                            # data_set.add(colu_row[cel_index].value)
-                            data_list.append(colu_row[cel_index].value)
+                    colum_index = 1  # 当前列
+                    for cel in row:
+                        if colum_index > max_colum:
+                            break
                         else:
-                            # tmp.append("")
-                            # data_set.add("")
+                            colum_index += 1
+                        if cel.value:
+                            data_list.append(cel.value)
+                        else:
                             data_list.append("")
-                            # null_cnt += 1
 
-                    # sheet_all_rows.append(tmp)
-                    # 如果是字典返回，需要每行/列作为一个列表，没循环一次，要清空一次（用于记录下一列/行）
-                    if pack == "dict":
-                        # 每列、每行一个列表记录，注意这里是  append 方法
-                        # sheet_all_rows.append(tmp)
-                        sheet_all_rows.append(data_list)
-                        data_list = []
-
-                # 清除空行
-                if read_type=='column':
-                    child_list_len = len(sheet_all_rows[0]) # 每列有多少个元素
-                    parent_list_len = len(sheet_all_rows) # 有多少列
-                    # 记录空行的位置
-                    empty_list = []
-                    for j in range(child_list_len):
-                        flag = 0
-                        for k in range(parent_list_len):
-                            if sheet_all_rows[k][j] != '':
-                                # 非空
-                                flag = 1
-                                break
-                        if flag == 0:
-                            # 整【行】都是空的
-                            empty_list.append(j)
-                    # print("empty cloum: ", empty_list)
-                    # 删除空行所在位置的列表元素
-                    # 先倒序排列，从最后删起，否则会报错
-                    empty_list.sort(reverse=True)
-                    for j in sheet_all_rows:
-                        for k in empty_list:
-                            j.pop(k)
-
-                # 生成字典，每个sheet一个字典节点
-                wb_sheets[sheet.title] = sheet_all_rows
+                    sheet_all_rows.append(data_list)
+                    # 每循环一次，要清空一次（用于记录下一行）
+                    data_list = []
+                    if row_index > max_row:
+                        break
+                    else:
+                        row_index += 1
+                # 做一次矩阵式转换，让行列交互
+                tmp_list = list(map(list, zip(*sheet_all_rows)))
+                # print(tmp_list)
+                if pack == "dict":
+                    # 生成字典，每个sheet一个字典节点
+                    wb_sheets[sheet.title] = tmp_list
         except Exception as err:
             print(err)
             return None
-
         if pack == "dict":
             return wb_sheets
         elif pack == "set":
-            return data_set
+            return set(data_list)
         else:
             return data_list
 
+
+    def get_excel_max_rows_and_colums(self,file=None):
+        """
+        计算excel文件最大的行和列，因为有部分excel文档被设置了单元格格式，实际内容为空
+        :param file:
+        :return {sheet_name:[max_row, max_colum]}
+        """
+        max_cnt = {}
+        # 打开文件
+        try:
+            # 只读文件，用 read_only 模式，省内存，而且速度快很多
+            workbook = load_workbook(file, read_only=True)
+            for sheet_name in workbook:
+                empty_row_cnt = 0  # 计算多少空行
+                max_row = 0 # 最大行数
+                max_colum = 0  # 最大列
+                for row in sheet_name.rows:
+                    # print(row)
+                    empty_flag = 0 # 空值标记,如果遍历一行后还是0，表示此行全空
+                    colum_cnt = 0  # 计算列
+                    for cel in row:
+                        if cel.value:
+                            colum_cnt += 1
+                            if colum_cnt > max_colum:
+                                max_colum = colum_cnt
+                            empty_flag = 1
+                    if not empty_flag:
+                        empty_row_cnt += 1
+                    else:
+                        empty_row_cnt = 0
+                        max_row += 1
+                    if empty_row_cnt > 20:
+                        # 连续空20行
+                        break
+                max_cnt[sheet_name.title] = [max_row, max_colum]
+        except Exception as bug:
+            print("we have a bug", bug)
+        return max_cnt
 
     def write_excel(self,data=None,file_name=None,sheet_name=None,rows=0,cl=0):
         """
