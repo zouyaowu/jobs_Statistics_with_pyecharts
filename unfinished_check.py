@@ -1,18 +1,16 @@
 import  erp_i
-from pyecharts import Bar, Grid, Page, Timeline
+from pyecharts.charts import Bar, Grid, Page, Timeline
 
 
-def unfiished_excel_check_result():
+def unfiished_excel_check_result(version=None):
     """待验证补丁结果汇总"""
 
     file_name = [
-     r'\\192.168.100.15\品质管制部_内部文件$\客户升级版本\V1.29版本\补丁\服装版本\待验证补丁\V1.29服装待验证补丁文档.xlsx',\
-     r'\\192.168.100.15\品质管制部_内部文件$\客户升级版本\V1.30版本\补丁\服装版本\待验证补丁\V1.30服装待验证补丁文档 .xlsx',\
-     r'\\192.168.100.15\品质管制部_内部文件$\内部测试更新\V1.31版本\V1.31服装版本\待验证补丁\V1.31服装待验证补丁文档.xlsx',\
-     r'\\192.168.100.15\品质管制部_内部文件$\客户升级版本\卡门项目\V1.29版本\补丁\待验证补丁\KM_V1.29服装待验证补丁文档 .xlsx',\
-     r'\\192.168.100.15\品质管制部_内部文件$\内部测试更新\卡门项目\V1.30版本\补丁\待验证补丁\KM_V1.30服装待验证补丁文档.xlsx',\
-     r'\\192.168.100.15\品质管制部_内部文件$\客户升级版本\宝胜项目\V1.32版本\补丁\待验证补丁\V1.32宝胜服装待验证补丁文档  .xlsx',\
-     r'\\192.168.100.15\品质管制部_内部文件$\客户升级版本\宝胜项目\V1.33版本\补丁\待验证补丁\V1.33宝胜服装待验证补丁文档.xlsx'
+     r'\\192.168.100.15\品质管制部_内部文件$\客户升级版本\V1.29版本\补丁\服装版本\待验证补丁\V1.29服装待验证补丁文档 - 最新.xlsx',
+     r'\\192.168.100.15\品质管制部_内部文件$\内部测试更新\V1.31版本\V1.31服装版本\待验证补丁\V1.31服装待验证补丁文档.xlsx',
+     r'\\192.168.100.15\品质管制部_内部文件$\客户升级版本\卡门项目\V1.29版本\补丁\待验证补丁\KM_V1.29服装待验证补丁文档 .xlsx',
+     r'\\192.168.100.15\品质管制部_内部文件$\客户升级版本\宝胜项目\V1.34版本\补丁\待验证补丁\V1.34宝胜服装待验证补丁文档.xlsx',
+     r'\\192.168.100.15\品质管制部_内部文件$\内部测试更新\宝胜项目\V1.35版本\待验证补丁\V1.35宝胜服装待验证补丁文档.xlsx'
     ]
     """
     file_name = [
@@ -23,7 +21,7 @@ def unfiished_excel_check_result():
     ]
     """
     page = Page()
-    tl = unfiished_check_result(file_name)
+    tl = unfiished_check_result(file_name, version)
     if tl:
         page.add(tl)
     return page
@@ -41,7 +39,7 @@ def jobs_test_result_per(file_name=None):
     check.specify_data_list(file_name)
 
 
-def unfiished_check_result(file_name=None):
+def unfiished_check_result(file_name=None, version=None):
     """检查待验证补丁的结果填写情况"""
     # 待验证补丁中未完成的测试
     if not file_name:
@@ -53,8 +51,9 @@ def unfiished_check_result(file_name=None):
     attr_modul = ['进销存', '电商', '商场', '会员', '仓储', '人力', '生产', '会员服务', '公共财务', '公共', '报表平台', '货品管理APP', '人事web', '羽绒',  'HKWEB平台']
     for file in file_name:
         tmp_dict = check.unfinished_test(file)
-        tmp = file.split('\\')[-1]
-        version = tmp.split('服装')[0]
+        if not version:
+            tmp = file.split('\\')[-1]
+            version = tmp.split('服装')[0]
         if not tmp_dict:
             print(version + "read excel err")
             continue
@@ -73,6 +72,7 @@ def unfiished_check_result(file_name=None):
         # bar.add("已测试", attr, done_v, is_label_show=True, label_pos='inside', is_stack=True, xaxis_interval=0)
         bar.add("待测试", attr, undone_v, is_label_show=True, label_pos='inside', is_stack=True, xaxis_interval=0)
         timeline.add(bar, version)
+        version = None
     return timeline
 
 
