@@ -282,7 +282,12 @@ class To_be_verified(public_methods):
                     if not field:
                         continue
                     # insert_data[sql_files[field]] 对应数据库中的字段名，如：dll、demand_number、sql_script
-                    insert_data[sql_files[field]] = column[row]
+                    try:
+                        insert_data[sql_files[field]] = column[row]
+                    except:
+                        print("处理数据失败")
+                        print(column)
+                        return False
                 # 版本号
                 insert_data["erp_version"] = str(version)
                 insert_data["row_number"] = row
