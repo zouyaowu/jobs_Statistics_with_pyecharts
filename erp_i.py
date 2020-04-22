@@ -28,8 +28,8 @@ class To_be_verified(public_methods):
 
     def __init__(self):
         # 数据库连接
-        # self.con = sqlite3.connect(":memory:") #  内存数据库
-        self.con = sqlite3.connect('erp_i.db3')  # 存入文件中
+        self.con = sqlite3.connect(":memory:") #  内存数据库
+        # self.con = sqlite3.connect('erp_i.db3')  # 存入文件中
         self.cur = self.con.cursor()
         self.table_name = "check_in_datas"
 
@@ -366,24 +366,39 @@ class To_be_verified(public_methods):
         # script_set.remove('')
         return (dll_set, script_set, except_file)
 
+    def time_tag(self):
+        return time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime(time.time()))
+
     def check_update_files_and_local_files(self,check_path='./', excel_file=None):
         """
         升级文件检查
-        :return:字典 {excel_miss:[], local_miss:[], files_time_mstake:[]}
+        :return:字典 {resulst: true/false, excel_file_miss_in_local:[], local_miss_in_excel:[], files_time_mstake:[]}
         """
+        # 记录日志
+        log_info = []
+        # 默认返回
+        res = {'result': False, 'excel_file_miss_in_local': [], 'local_miss_in_excel': [], 'files_time_mstake': [], 'log_info': []}
+
         # 获取本地文件列表（文件名、修改日期）
         file_name_and_modify_date = self.get_file_list(check_path)
         file_name_keys = list(file_name_and_modify_date.keys())
-        file_name = [s.lower() for s in file_name_keys if isinstance(s, str) == True]
-        # print("找到的文件", file_name)
+        file_name = set(s.lower() for s in file_name_keys if isinstance(s, str) == True)
+        log_info.append([self.time_tag, "找到的文件", file_name])
 
+        # 排除的文件记录在一个文本文件每次读出，本地文件列表中，删掉这些要排除的
+        ignore_file_name = ()
+        with open("ignore.txt", "r") as f:
+            ignore_file_name_tmp = f.readlines()
+        ignore_file_name = set(s.replace("\n","").lower() for s in ignore_file_name_tmp)
+        file_name = file_name - ignore_file_name
         # 逐行对比excel记录（先存入表格中），检查文件名、修改日期
         # version = time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime(time.time()))
-        version = "V1.29.46.001"
-        # self.excel_date_to_db(excel_file, version)
+        version = self.time_tag
         if not self.excel_date_to_db(excel_file, version):
-            print("无法创建数据表，检查失败")
-            return False
+            print("无法创建数据表")
+            log_info.append([self.time_tag, "创建数据表失败"])
+            res['log_info'] = log_info
+            return res
         # 此处应该要动态配置表名，但是用 (?) 方式会导致报错，待解决
         getfile_sql = "select sheet_name,row_number,dll,sql_script,date_pack from check_in_datas"
         cor = self.cur.execute(getfile_sql)
@@ -395,7 +410,6 @@ class To_be_verified(public_methods):
         excel_sql_files_not_found_in_local = []
         for i in cor.fetchall():
             # 数据库里面的程序列
-            # print(i[0],"|",i[1],"|",i[2],"|",i[3],"|",i[4])
             row_number = i[1]
             excel_dll = i[2]
             # 数据库记录的excel脚本列
@@ -408,8 +422,8 @@ class To_be_verified(public_methods):
                 # dll这栏可能没写后缀名,是 dll 或 exe，目前暂未出现dll与exe的文件名一致的
                 k = k.strip()
                 if len(k) > 4:
-                    if k[-4:] == ".dll" or k[-4:] == ".exe":
-                        tmp_exe = tmp_dll = k
+                    if k[-4:].lower() == ".dll" or k[-4:].lower() == ".exe":
+                        tmp_exe = tmp_dll = k.lower()
                     else:
                         tmp_dll = k + ".dll"
                         tmp_exe = k + ".exe"
@@ -418,38 +432,43 @@ class To_be_verified(public_methods):
                     tmp_exe = k + ".exe"
                 # print(tmp_dll.lower(), "in ", file_name)
                 if tmp_dll.lower() in file_name:
-                    excel_dll_files_found_in_local.append(tmp_dll)
+                    excel_dll_files_found_in_local.append(tmp_dll.lower())
                 elif tmp_exe.lower() in file_name:
-                    excel_dll_files_found_in_local.append(tmp_exe)
+                    excel_dll_files_found_in_local.append(tmp_exe.lower())
                 else:
                     # 没有找到文件
                     if k:
-                        # print("没找到的dll[%s,%s] in %s" % (tmp_dll.lower(), tmp_exe.lower(),file_name))
-                        # excel_dll_files_not_found_in_local.append(k + "," + row_number)
+                        log_info.append([self.time_tag, "excel行：",row_number, "==没找到的程序==" , k, file_name])
                         excel_dll_files_not_found_in_local.append(k)
             for j in excel_sql.split("\n"):
                 j = j.strip()
                 tmp_sql = j.split("/")[-1]
                 if tmp_sql.lower() in file_name:
-                    excel_sql_files_found_in_local.append(tmp_sql)
-                    # print("in excel", j)
+                    excel_sql_files_found_in_local.append(tmp_sql.lower())
                 else:
                     if tmp_sql:
-                        # excel_sql_files_not_found_in_local.append(tmp_sql + "," + row_number)
+                        log_info.append([self.time_tag, "excel行：", row_number, "==没找到的脚本==", tmp_sql, file_name])
                         excel_sql_files_not_found_in_local.append(tmp_sql)
 
-        print("****************")
-        print("excel中统计到文件数量：%s / 本地找到的文件数：%s " % ((len(set(excel_sql_files_found_in_local)) + \
-                                                                    len(set(excel_dll_files_found_in_local))) , len(file_name)))
-        # print("找到的dll", set(excel_dll_files_found_in_local))
-        print("****************")
+        log_info.append(["excel中统计到文件数量：%s / 本地找到的文件数：%s " % ((len(set(excel_sql_files_found_in_local)) + \
+                                                                    len(set(excel_dll_files_found_in_local))) , len(file_name))])
+        log_info.append("****************")
         # 本地找到，excel没有
-        print("本地找到，excel中没有的文件: ", set(file_name) - set(excel_dll_files_found_in_local) - set(excel_sql_files_found_in_local))
-        print("****************")
+        log_info.append(["本地找到，excel中没有的文件: ", set(file_name) - set(excel_dll_files_found_in_local) - set(excel_sql_files_found_in_local)])
+        log_info.append("****************")
         # excel 有，本地没有的
-        print("excel中的程序文件，在本地没找到：", set(excel_dll_files_not_found_in_local))
-        print("excel中的脚本文件，在本地没找到：", set(excel_sql_files_not_found_in_local))
-        print("****************")
+        log_info.append(["excel中的程序文件，在本地没找到：", set(excel_dll_files_not_found_in_local)])
+        log_info.append(["excel中的脚本文件，在本地没找到：", set(excel_sql_files_not_found_in_local)])
+        log_info.append("****************")
+        res = {'result': False, 'excel_file_miss_in_local': [], 'local_miss_in_excel': [], 'files_time_mstake': [],
+               'log_info': []}
+        res['result'] = True
+        res['excel_file_miss_in_local'] = list(set(excel_dll_files_not_found_in_local) | set(excel_sql_files_not_found_in_local))
+        res['local_miss_in_excel'] = list(set(file_name) - set(excel_dll_files_found_in_local) - set(excel_sql_files_found_in_local))
+        res['files_time_mstake'] = ''
+        res['log_info'] = log_info
+        # test
+        return res
 
 
     def patch_check(self,path='./', excel_file=None):

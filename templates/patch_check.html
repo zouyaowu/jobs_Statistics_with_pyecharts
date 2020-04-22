@@ -1,0 +1,22 @@
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>{{ title }}</title>
+</head>
+<body>
+    <br />
+    {% for list_data in list_datas %}
+    <table border=1>
+    <tr><td>{{ list_data['version'] }}</td><td></td></tr>
+    <tr><th>excel表格中有，本地没有找到</th><th>本地比excel多的</th></tr>
+    <tr><td>
+    {% for s in list_data['check_list'][0] %}{{ s }},{% endfor %}
+    </td><td>
+    {% for s in list_data['check_list'][1] %}{{ s }},{% endfor %}
+    </td></tr>
+    </table>
+    <br />
+    <br />
+    {% endfor %}
+</body>
+</html>
