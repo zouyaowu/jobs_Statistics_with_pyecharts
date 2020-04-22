@@ -5,6 +5,8 @@
 .idea/misc.xml
 .idea/modules.xml
 .idea/vcs.xml
+.idea
 __pycache__/erp_i.cpython-34.pyc
 __pycache__/public.cpython-34.pyc
 __pycache__/unfinished_check.cpython-34.pyc
+venv
