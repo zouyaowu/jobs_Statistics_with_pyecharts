@@ -286,6 +286,8 @@ class To_be_verified(public_methods):
                         insert_data[sql_files[field]] = column[row]
                     except:
                         print("处理数据失败")
+                        print(excel_file)
+                        print(sheets_name)
                         print(column)
                         return False
                 # 版本号
